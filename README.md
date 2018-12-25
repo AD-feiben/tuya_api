@@ -6,7 +6,7 @@ tuya_api is a lib that make you easier to use [tuya's api](https://docs.tuya.com
 ## Install
 
 ```bash
-pip install tuya_api
+pip install tuya-api
 ```
 
 ## Example
