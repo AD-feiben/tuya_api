@@ -58,6 +58,6 @@ if __name__ == '__main__':
 
 [document](https://github.com/AD-feiben/tuya_api/blob/master/doc.md)
 
-## Auther
+## Author
 
 Feiben(feiben.dev@gmail.com)
