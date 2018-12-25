@@ -56,7 +56,7 @@ if __name__ == '__main__':
 
 ## Document
 
-[document](./doc.md)
+[document](https://github.com/AD-feiben/tuya_api/blob/master/doc.md)
 
 ## Auther
 
