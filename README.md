@@ -1,6 +1,6 @@
-## tuya_api
+## tuya-api
 
-tuya_api is a lib that make you easier to use [tuya's api](https://docs.tuya.com/cn/openapi/index.html).
+tuya-api is a lib that make you easier to use [tuya's api](https://docs.tuya.com/cn/openapi/index.html).
 
 
 ## Install
