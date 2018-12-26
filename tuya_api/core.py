@@ -10,6 +10,10 @@ def current_milli_time():
     return int(round(time.time() * 1000))
 
 
+def gen_md5(s):
+    return hashlib.md5(s.encode('utf-8')).hexdigest()
+
+
 class Tuya(object):
     def __init__(self,
                  client_id: str,
@@ -25,57 +29,55 @@ class Tuya(object):
         :param region: 根据环境切换接口地址，['cn', 'us', 'eu'] 默认为 cn
         """
 
-        self.sign = None
-        self.access_token = None
-        self.refresh_token = None
+        self.__sign = None
+        self.__access_token = None
+        self.__refresh_token = None
         # 刷新 token 的临界值，默认为提前 300s 刷新token
         self.token_threshold = threshold
-        self.expire_time = 0
-        self.timestamp = 0
+        self.__expire_time = 0
+        self.__timestamp = 0
 
         if region not in ['cn', 'us', 'eu']:
             raise ValueError('region value is no expect')
 
-        self.url = 'https://openapi.tuya{region}.com'.format(region=region)
+        self.__url = 'https://openapi.tuya{region}.com'.format(region=region)
 
         self.client_id = client_id
         self.secret = secret
         self.schema = schema
 
-        self.http_client = httpclient.AsyncHTTPClient()
+        self.__http_client = httpclient.AsyncHTTPClient()
 
     # 计算签名
     def __calc_sign(self, has_token: bool=False):
         # has_token 为 True 时，access_token 必须存在
-        hl = hashlib.md5()
-        self.timestamp = str(current_milli_time())
+        self.__timestamp = str(current_milli_time())
 
         if has_token is True:
-            if self.access_token is None:
+            if self.__access_token is None:
                 raise Exception('Tuya.__calc_sign: access token is None!')
-            token = self.access_token
+            token = self.__access_token
         else:
             token = ''
 
-        s = self.client_id + token + self.secret + self.timestamp
-        hl.update(s.encode(encoding='utf-8'))
-        self.sign = hl.hexdigest().upper()
+        s = self.client_id + token + self.secret + self.__timestamp
+        self.__sign = gen_md5(s).upper()
 
     # 获取请求头
     async def __get_header(self):
-        if self.access_token is None or (current_milli_time() > self.timestamp + self.expire_time):
+        if self.__access_token is None or (current_milli_time() > self.__timestamp + self.__expire_time):
             # token 不存在或已过期，重新获取 token
             await self.get_access_token()
-        elif current_milli_time() > self.timestamp + self.expire_time + (self.token_threshold * 1000):
+        elif current_milli_time() > self.__timestamp + self.__expire_time + (self.token_threshold * 1000):
             # token 过期时间大于临界值时
-            await self.refresh_token()
+            await self.__refresh_token()
 
         self.__calc_sign(has_token=True)
         header = {
             'client_id': self.client_id,
-            'access_token': self.access_token,
-            'sign': self.sign,
-            't': self.timestamp
+            'access_token': self.__access_token,
+            'sign': self.__sign,
+            't': self.__timestamp
         }
         return header
 
@@ -90,15 +92,15 @@ class Tuya(object):
         try:
             self.__calc_sign()
             url = '{url}/v1.0/token?grant_type={grant_type}&code={code}' \
-                .format(url=self.url, grant_type=grant_type, code=code)
+                .format(url=self.__url, grant_type=grant_type, code=code)
 
             headers = {
                 'client_id': self.client_id,
-                'sign': self.sign,
-                't': self.timestamp
+                'sign': self.__sign,
+                't': self.__timestamp
             }
 
-            response = await self.http_client.fetch(
+            response = await self.__http_client.fetch(
                 request=url,
                 headers=headers,
                 validate_cert=False
@@ -111,9 +113,9 @@ class Tuya(object):
                 body = json.loads(body_str)
 
                 if body['success'] is True:
-                    self.access_token = body['result']['access_token']
-                    self.refresh_token = body['result']['refresh_token']
-                    self.expire_time = body['result']['expire_time']
+                    self.__access_token = body['result']['access_token']
+                    self.__refresh_token = body['result']['refresh_token']
+                    self.__expire_time = body['result']['expire_time']
                     return body
                 else:
                     raise Exception(body['msg'])
@@ -123,23 +125,23 @@ class Tuya(object):
 
     async def refresh_token(self, grant_type: int=1, code: str=None):
         """
-        刷新 access_token, 如果 access_token 不存在等同于 access_token
+        刷新 access_token, 如果 access_token 不存在等同于 get_access_token
         :param grant_type: 授权模式 1-简易模式 2-授权码模式
         :param code: 授权码
         :return:
         """
         try:
-            if self.access_token is None or self.refresh_token is None:
-                return await self.get_access_token_async(grant_type=grant_type, code=code)
+            if self.__access_token is None or self.__refresh_token is None:
+                return await self.get_access_token(grant_type=grant_type, code=code)
             self.__calc_sign(False)
-            url = '{url}/v1.0/token/{refresh_token}'.format(url=self.url, refresh_token=self.refresh_token)
+            url = '{url}/v1.0/token/{refresh_token}'.format(url=self.__url, refresh_token=self.__refresh_token)
             headers = {
                 'client_id': self.client_id,
-                'sign': self.sign,
-                't': self.timestamp
+                'sign': self.__sign,
+                't': self.__timestamp
             }
 
-            response = await self.http_client.fetch(
+            response = await self.__http_client.fetch(
                 request=url,
                 headers=headers,
                 validate_cert=False
@@ -152,9 +154,9 @@ class Tuya(object):
                 body = json.loads(body_str)
 
                 if body['success'] is True:
-                    self.access_token = body['result']['access_token']
-                    self.refresh_token = body['result']['refresh_token']
-                    self.expire_time = body['result']['expire_time']
+                    self.__access_token = body['result']['access_token']
+                    self.__refresh_token = body['result']['refresh_token']
+                    self.__expire_time = body['result']['expire_time']
                     return body
                 else:
                     raise Exception(body['msg'])
@@ -163,7 +165,7 @@ class Tuya(object):
             return None
 
     # 用户相关接口
-    async def get_users(self, page_no: int or str=1, page_size: int or str=10):
+    async def get_users(self, page_no: int or str='1', page_size: int or str='10'):
         """
         获取用户列表
         :param page_no: 当前页
@@ -175,9 +177,9 @@ class Tuya(object):
             page_size = int(page_size)
             headers = await self.__get_header()
             url = '{url}/v1.0/apps/{schema}/users?page_no={page_no}&page_size={page_size}'\
-                .format(url=self.url, schema=self.schema, page_no=page_no, page_size=page_size)
+                .format(url=self.__url, schema=self.schema, page_no=page_no, page_size=page_size)
 
-            response = await self.http_client.fetch(
+            response = await self.__http_client.fetch(
                 request=url,
                 headers=headers,
                 validate_cert=False
@@ -203,17 +205,17 @@ class Tuya(object):
         try:
             headers = await self.__get_header()
             headers['Content-Type'] = 'application/json'
-            url = '{url}/v1.0/apps/{schema}/user'.format(url=self.url, schema=self.schema)
+            url = '{url}/v1.0/apps/{schema}/user'.format(url=self.__url, schema=self.schema)
 
             data = {
                 'country_code': country_code,
                 'username': username,
-                'password': password,
+                'password': gen_md5(password),
                 'nick_name': nick_name,
                 'username_type': username_type
             }
             body = json.dumps(data)
-            response = await self.http_client.fetch(
+            response = await self.__http_client.fetch(
                 request=url,
                 method='POST',
                 headers=headers,
@@ -232,8 +234,8 @@ class Tuya(object):
         :return:
         """
         try:
-            url = '{url}/v1.0/users/{uid}/devices'.format(url=self.url, uid=uid)
-            response =  await self.http_client.fetch(
+            url = '{url}/v1.0/users/{uid}/devices'.format(url=self.__url, uid=uid)
+            response =  await self.__http_client.fetch(
                 request=url,
                 headers=await self.__get_header(),
                 validate_cert=False
@@ -257,7 +259,7 @@ class Tuya(object):
         :return:
         """
         try:
-            url = '{url}/v1.0/devices/token'.format(url=self.url)
+            url = '{url}/v1.0/devices/token'.format(url=self.__url)
             headers = await self.__get_header()
             headers['Content-Type'] = 'application/json'
             data = {
@@ -268,7 +270,7 @@ class Tuya(object):
                 'lang': lang
             }
             body = json.dumps(data)
-            response = await self.http_client.fetch(
+            response = await self.__http_client.fetch(
                 request=url,
                 method='POST',
                 headers=headers,
@@ -287,8 +289,8 @@ class Tuya(object):
         :return:
         """
         try:
-            url = '{url}/v1.0/devices/tokens/{token}'.format(url=self.url, token=token)
-            response = await self.http_client.fetch(
+            url = '{url}/v1.0/devices/tokens/{token}'.format(url=self.__url, token=token)
+            response = await self.__http_client.fetch(
                 request=url,
                 headers=await self.__get_header(),
                 validate_cert=False
@@ -305,8 +307,8 @@ class Tuya(object):
         :return:
         """
         try:
-            url = '{url}/v1.0/devices/{device_id}'.format(url=self.url, device_id=device_id)
-            response = await self.http_client.fetch(
+            url = '{url}/v1.0/devices/{device_id}'.format(url=self.__url, device_id=device_id)
+            response = await self.__http_client.fetch(
                 request=url,
                 headers=await self.__get_header(),
                 validate_cert=False
@@ -323,8 +325,8 @@ class Tuya(object):
         :return:
         """
         try:
-            url = '{url}/v1.0/devices?device_ids={device_ids}'.format(url=self.url, device_ids=','.join(device_ids))
-            response = await self.http_client.fetch(
+            url = '{url}/v1.0/devices?device_ids={device_ids}'.format(url=self.__url, device_ids=','.join(device_ids))
+            response = await self.__http_client.fetch(
                 request=url,
                 headers=await self.__get_header(),
                 validate_cert=False
@@ -341,8 +343,8 @@ class Tuya(object):
         :return:
         """
         try:
-            url = '{url}/v1.0/functions/{category}'.format(url=self.url, category=category)
-            response = await self.http_client.fetch(
+            url = '{url}/v1.0/functions/{category}'.format(url=self.__url, category=category)
+            response = await self.__http_client.fetch(
                 request=url,
                 headers=await self.__get_header(),
                 validate_cert=False
@@ -359,8 +361,8 @@ class Tuya(object):
         :return:
         """
         try:
-            url = '{url}/v1.0/devices/{deviceId}/functions'.format(url=self.url, deviceId=device_id)
-            response = await self.http_client.fetch(
+            url = '{url}/v1.0/devices/{deviceId}/functions'.format(url=self.__url, deviceId=device_id)
+            response = await self.__http_client.fetch(
                 request=url,
                 headers=await self.__get_header(),
                 validate_cert=False
@@ -377,8 +379,8 @@ class Tuya(object):
         :return:
         """
         try:
-            url = '{url}/v1.0/devices/{device_id}/status'.format(url=self.url, device_id=device_id)
-            response = await self.http_client.fetch(
+            url = '{url}/v1.0/devices/{device_id}/status'.format(url=self.__url, device_id=device_id)
+            response = await self.__http_client.fetch(
                 request=url,
                 headers=await self.__get_header(),
                 validate_cert=False
@@ -396,8 +398,8 @@ class Tuya(object):
         """
         try:
             url = '{url}/v1.0/devices/status?device_ids={device_ids}'\
-                .format(url=self.url, device_ids=','.join(device_ids))
-            response = await self.http_client.fetch(
+                .format(url=self.__url, device_ids=','.join(device_ids))
+            response = await self.__http_client.fetch(
                 request=url,
                 headers=await self.__get_header(),
                 validate_cert=False
@@ -415,11 +417,11 @@ class Tuya(object):
         :return:
         """
         try:
-            url = '{url}/v1.0/devices/{device_id}/commands'.format(url=self.url, device_id=device_id)
+            url = '{url}/v1.0/devices/{device_id}/commands'.format(url=self.__url, device_id=device_id)
             headers = await self.__get_header()
             headers['Content-Type'] = 'application/json'
             body = json.dumps({'commands': commands})
-            response = await self.http_client.fetch(
+            response = await self.__http_client.fetch(
                 request=url,
                 method='POST',
                 headers=headers,
@@ -437,8 +439,8 @@ class Tuya(object):
         :return:
         """
         try:
-            url = '{url}/v1.0/devices/{device_id}'.format(url=self.url, device_id=device_id)
-            response = await self.http_client.fetch(
+            url = '{url}/v1.0/devices/{device_id}'.format(url=self.__url, device_id=device_id)
+            response = await self.__http_client.fetch(
                 request=url,
                 method="DELETE",
                 headers= await self.__get_header()

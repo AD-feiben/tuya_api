@@ -56,6 +56,7 @@
 | nick_name     | str  | True               |
 | username_type | str  | False (default: 3) |
 
+> **The password is automatically encrypted using MD5** 
 
 
 ### Tuya.get_user_devices_by_uid
