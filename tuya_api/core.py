@@ -34,6 +34,7 @@ class Tuya(object):
         self.__refresh_token = None
         # 刷新 token 的临界值，默认为提前 300s 刷新token
         self.token_threshold = threshold
+        # 13位标准时间戳
         self.__expire_time = 0
         self.__timestamp = 0
 
@@ -115,7 +116,7 @@ class Tuya(object):
                 if body['success'] is True:
                     self.__access_token = body['result']['access_token']
                     self.__refresh_token = body['result']['refresh_token']
-                    self.__expire_time = body['result']['expire_time']
+                    self.__expire_time = body['result']['expire_time'] * 1000
                     return body
                 else:
                     raise Exception(body['msg'])
@@ -156,7 +157,7 @@ class Tuya(object):
                 if body['success'] is True:
                     self.__access_token = body['result']['access_token']
                     self.__refresh_token = body['result']['refresh_token']
-                    self.__expire_time = body['result']['expire_time']
+                    self.__expire_time = body['result']['expire_time'] * 1000
                     return body
                 else:
                     raise Exception(body['msg'])
