@@ -52,7 +52,7 @@ class Tuya(object):
     # 计算签名
     def __calc_sign(self, has_token: bool=False):
         # has_token 为 True 时，access_token 必须存在
-        self.__timestamp = str(current_milli_time())
+        self.__timestamp = current_milli_time()
 
         if has_token is True:
             if self.__access_token is None:
@@ -61,7 +61,7 @@ class Tuya(object):
         else:
             token = ''
 
-        s = self.client_id + token + self.secret + self.__timestamp
+        s = self.client_id + token + self.secret + str(self.__timestamp)
         self.__sign = gen_md5(s).upper()
 
     # 获取请求头
@@ -78,7 +78,7 @@ class Tuya(object):
             'client_id': self.client_id,
             'access_token': self.__access_token,
             'sign': self.__sign,
-            't': self.__timestamp
+            't': str(self.__timestamp)
         }
         return header
 
@@ -98,7 +98,7 @@ class Tuya(object):
             headers = {
                 'client_id': self.client_id,
                 'sign': self.__sign,
-                't': self.__timestamp
+                't': str(self.__timestamp)
             }
 
             response = await self.__http_client.fetch(
@@ -139,7 +139,7 @@ class Tuya(object):
             headers = {
                 'client_id': self.client_id,
                 'sign': self.__sign,
-                't': self.__timestamp
+                't': str(self.__timestamp)
             }
 
             response = await self.__http_client.fetch(
